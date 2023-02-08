@@ -30,6 +30,7 @@ HOMEWORK_VERDICTS = {
 
 
 def check_tokens():
+    """Прооверят наличие токенов"""
     try:
         if PRACTICUM_TOKEN is None:
             logging.critical('PRACTICUM_TOKEN отсутствует')
@@ -42,6 +43,7 @@ def check_tokens():
 
 
 def send_message(bot: telegram.Bot, message):
+    """Проверяет возможность бота отправить сообщение"""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.info('Отправка сообщений работает')
@@ -51,6 +53,7 @@ def send_message(bot: telegram.Bot, message):
 
 
 def get_api_answer(timestamp):
+    """Проверят Эндпоинт на ответ"""
     try:
         response = requests.get(
             url=ENDPOINT, headers=HEADERS, params={'from_date': timestamp}
@@ -67,6 +70,7 @@ def get_api_answer(timestamp):
 
 
 def check_response(response):
+    """Проверяет ответ от API"""
     try:
         response = response.json()
         if type(response) is not dict:
@@ -85,6 +89,7 @@ def check_response(response):
 
 
 def parse_status(homework):
+    """Получает статус домашки"""
     homework_name = homework.get('homework_name')
     homework_status = homework.get('status')
 
