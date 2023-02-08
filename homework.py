@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import time
 from http import HTTPStatus
 
@@ -31,25 +32,23 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Прооверят наличие токенов."""
-    try:
-        if PRACTICUM_TOKEN is None:
-            logging.critical('PRACTICUM_TOKEN отсутствует')
-        if TELEGRAM_TOKEN is None:
-            logging.critical('TELEGRAM_TOKEN отсутствует')
-        if TELEGRAM_CHAT_ID is None:
-            logging.critical('TELEGRAM_CHAT_ID отсутствует')
-    except Exception:
-        raise Exception('Не хватает вводныхданных для запуска')
+    if PRACTICUM_TOKEN is None:
+        logging.critical('PRACTICUM_TOKEN отсутствует')
+    if TELEGRAM_TOKEN is None:
+        logging.critical('TELEGRAM_TOKEN отсутствует')
+    if TELEGRAM_CHAT_ID is None:
+        logging.critical('TELEGRAM_CHAT_ID отсутствует')
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def send_message(bot: telegram.Bot, message):
     """Проверяет возможность бота отправить сообщение."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
-        logging.info('Отправка сообщений работает')
+        logging.debug('Отправка сообщений работает')
     except Exception as error:
         print(error)
-        logging.critical('Сообщение не отправляется')
+        logging.error('Сообщение не отправляется')
 
 
 def get_api_answer(timestamp):
@@ -59,20 +58,18 @@ def get_api_answer(timestamp):
             url=ENDPOINT, headers=HEADERS, params={'from_date': timestamp}
         )
         logging.info('Эндпоинт сработал')
-        if response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR:
+        if response.status_code != HTTPStatus.OK:
             logging.error('API не ответил')
-            time.sleep(RETRY_PERIOD)
             return get_api_answer(timestamp)
-    except requests.ConnectionError as error:
+    except requests.RequestException as error:
         print(error)
         logging.critical('Эндпоинт недоступен')
-    return response
+    return response.json()
 
 
 def check_response(response):
     """Проверяет ответ от API."""
     try:
-        response = response.json()
         if type(response) is not dict:
             dict_error = 'Словарь не получен'
             logging.debug(dict_error)
@@ -109,7 +106,10 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-    check_tokens()
+    if not check_tokens():
+        message = 'Токены отсутствуют'
+        logging.critical(message)
+        sys.exit(message)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = 0
@@ -127,12 +127,15 @@ def main():
             homeworks = check_response(api_answer)
             message = parse_status(homeworks)
             send_message(bot, message)
-            time.sleep(RETRY_PERIOD)
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.critical(message)
 
+        time.sleep(RETRY_PERIOD)
+
 
 if __name__ == '__main__':
     main()
+
+f
