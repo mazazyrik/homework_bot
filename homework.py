@@ -32,6 +32,8 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Прооверят наличие токенов."""
+    logging.info('Проверка токенов')
+
     if PRACTICUM_TOKEN is None:
         logging.critical('PRACTICUM_TOKEN отсутствует')
     if TELEGRAM_TOKEN is None:
@@ -43,50 +45,57 @@ def check_tokens():
 
 def send_message(bot: telegram.Bot, message):
     """Проверяет возможность бота отправить сообщение."""
+    logging.info('Отправка сообщения')
+
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.debug('Отправка сообщений работает')
     except Exception as error:
-        print(error)
+        logging.error(error)
         logging.error('Сообщение не отправляется')
 
 
 def get_api_answer(timestamp):
     """Проверят Эндпоинт на ответ."""
+    logging.info('Обращение к Эндпоинту')
+
     try:
         response = requests.get(
             url=ENDPOINT, headers=HEADERS, params={'from_date': timestamp}
         )
         logging.info('Эндпоинт сработал')
         if response.status_code != HTTPStatus.OK:
-            logging.error('API не ответил')
-            return get_api_answer(timestamp)
+            logging.error('API ответил не с кодом 200')
+            raise requests.RequestException
     except requests.RequestException as error:
-        print(error)
+        logging.error(error)
         logging.critical('Эндпоинт недоступен')
+        raise Exception('Ошибка при подключении к Эндпоинту')
     return response.json()
 
 
 def check_response(response):
     """Проверяет ответ от API."""
     try:
-        if type(response) is not dict:
+        if not isinstance(response, dict):
             dict_error = 'Словарь не получен'
-            logging.debug(dict_error)
+            logging.critical(dict_error)
             raise TypeError(dict_error)
-        homeworks = response.get('homeworks')
-        if type(homeworks) is not list:
+        homework = response.get('homeworks')
+        if not isinstance(homework, list):
             list_error = 'Список домашек не список'
-            logging.debug(list_error)
+            logging.error(list_error)
             raise TypeError(list_error)
     except KeyError as error:
-        print(error)
+        logging.error(error)
         logging.debug('Ключ homeworks отсутствует')
-    return homeworks[0]
+    return homework[0]
 
 
 def parse_status(homework):
     """Получает статус домашки."""
+    logging.info('Получение статуса домашки')
+
     homework_name = homework.get('homework_name')
     homework_status = homework.get('status')
 
@@ -106,6 +115,8 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
+    logging.info('Бот запустился')
+
     if not check_tokens():
         message = 'Токены отсутствуют'
         logging.critical(message)
@@ -113,6 +124,7 @@ def main():
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = 0
+    # timestamp = time.time()
 
     FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
 
@@ -131,6 +143,7 @@ def main():
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.critical(message)
+            send_message(bot, message)
 
         time.sleep(RETRY_PERIOD)
 
