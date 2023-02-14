@@ -92,7 +92,7 @@ def check_response(response):
     except KeyError as error:
         logging.error(error)
         logging.debug('Ключ homeworks отсутствует')
-    return homeworks[0]
+    return homeworks
 
 
 def parse_status(homework: list):
@@ -139,8 +139,7 @@ def main():
         try:
             api_answer = get_api_answer(timestamp)
             timestamp = api_answer.get('current_date')
-            api_answer_2 = get_api_answer(timestamp)
-            response = check_response(api_answer_2)
+            response = check_response(api_answer)[0]
             if response != []:
                 message = parse_status(response)
                 send_message(bot, message)
