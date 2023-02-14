@@ -9,6 +9,8 @@ import telegram
 from dotenv import load_dotenv
 from telegram.ext import Updater
 
+from exceptions import APIRequestException
+
 load_dotenv()
 
 
@@ -52,7 +54,6 @@ def send_message(bot: telegram.Bot, message):
         logging.debug('Отправка сообщений работает')
     except Exception as error:
         logging.error(error)
-        logging.error('Сообщение не отправляется')
 
 
 def get_api_answer(timestamp):
@@ -66,33 +67,35 @@ def get_api_answer(timestamp):
         logging.info('Эндпоинт сработал')
         if response.status_code != HTTPStatus.OK:
             logging.error('API ответил не с кодом 200')
-            raise requests.RequestException
+            raise requests.RequestException('Код ответа не 200')
     except requests.RequestException as error:
         logging.error(error)
         logging.critical('Эндпоинт недоступен')
-        raise Exception('Ошибка при подключении к Эндпоинту')
+        raise APIRequestException
     return response.json()
 
 
 def check_response(response):
     """Проверяет ответ от API."""
+    logging.info('Проверка ответа от API')
+
     try:
         if not isinstance(response, dict):
             dict_error = 'Словарь не получен'
             logging.critical(dict_error)
             raise TypeError(dict_error)
-        homework = response.get('homeworks')
-        if not isinstance(homework, list):
+        homeworks = response.get('homeworks')
+        if not isinstance(homeworks, list):
             list_error = 'Список домашек не список'
             logging.error(list_error)
             raise TypeError(list_error)
     except KeyError as error:
         logging.error(error)
         logging.debug('Ключ homeworks отсутствует')
-    return homework[0]
+    return homeworks[0]
 
 
-def parse_status(homework):
+def parse_status(homework: list):
     """Получает статус домашки."""
     logging.info('Получение статуса домашки')
 
@@ -123,8 +126,7 @@ def main():
         sys.exit(message)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp = 0
-    # timestamp = time.time()
+    timestamp = int(time.time())
 
     FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
 
@@ -136,13 +138,18 @@ def main():
     while True:
         try:
             api_answer = get_api_answer(timestamp)
-            homeworks = check_response(api_answer)
-            message = parse_status(homeworks)
-            send_message(bot, message)
+            timestamp = api_answer.get('current_date')
+            api_answer_2 = get_api_answer(timestamp)
+            response = check_response(api_answer_2)
+            if response != []:
+                message = parse_status(response)
+                send_message(bot, message)
+                logging.info('Статус обновлен и отправлен')
+            else:
+                logging.info('Статус не обновлен')
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            logging.critical(message)
             send_message(bot, message)
 
         time.sleep(RETRY_PERIOD)
